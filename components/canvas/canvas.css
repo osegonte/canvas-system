@@ -1,16 +1,43 @@
-/* Hide tldraw's top menu for cleaner look */
+/* Cleaner interface like Overflow */
+
+/* Hide top menu bar */
 .tlui-menu-zone {
-  display: none !important;
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* Minimal toolbar at bottom */
+/* Show menu on hover */
+.tlui-menu-zone:hover {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Minimal toolbar */
 .tlui-toolbar {
-  background: rgba(255, 255, 255, 0.95) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px);
   border-radius: 12px !important;
-  padding: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Clean dotted grid like Overflow */
-.tl-background {
-  background-size: 20px 20px !important;
+/* Hide some toolbar items for minimal look */
+.tlui-toolbar__extras {
+  display: none;
+}
+
+/* Clean grid dots like Overflow */
+.tl-background__grid {
+  opacity: 0.3;
+}
+
+/* Smoother pan/zoom */
+.tl-canvas {
+  transition: transform 0.05s ease-out;
+}
+
+/* Cleaner selection handles */
+.tl-selection__fg {
+  stroke: #3b82f6 !important;
+  stroke-width: 1.5px !important;
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import { Tldraw, Editor, TLStoreSnapshot } from '@tldraw/tldraw'
+import { Tldraw, Editor } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
+import './canvas.css'  // Add this line
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -21,32 +22,14 @@ export function InfiniteCanvas({ nodeId }: InfiniteCanvasProps) {
     }
   }, [])
 
-  const handleMount = async (editor: Editor) => {
+  const handleMount = (editor: Editor) => {
     editorRef.current = editor
 
-    // Load saved canvas
-    try {
-      const { data } = await supabase
-        .from('canvas_data')
-        .select('snapshot')
-        .eq('node_id', nodeId)
-        .single()
-
-      if (data?.snapshot && Object.keys(data.snapshot).length > 0) {
-        // Check if snapshot has valid structure
-        if (data.snapshot.store || data.snapshot.schema) {
-          editor.store.loadSnapshot(data.snapshot)
-          console.log('📥 Canvas loaded')
-        }
-      } else {
-        console.log('📄 New canvas')
-      }
-    } catch (err) {
-      console.log('📄 New canvas (error loading):', err)
-    }
+    // Load saved canvas (async but don't block mount)
+    loadCanvas(editor)
 
     // Auto-save on changes
-    const handleChange = () => {
+    const cleanup = editor.store.listen(() => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
@@ -54,9 +37,32 @@ export function InfiniteCanvas({ nodeId }: InfiniteCanvasProps) {
       saveTimeoutRef.current = setTimeout(() => {
         saveCanvas(editor)
       }, 2000)
-    }
+    }, { scope: 'document' })
 
-    editor.store.listen(handleChange, { scope: 'document' })
+    // Return cleanup function
+    return cleanup
+  }
+
+  const loadCanvas = async (editor: Editor) => {
+    try {
+      const { data } = await supabase
+        .from('canvas_data')
+        .select('snapshot')
+        .eq('node_id', nodeId)
+        .single()
+
+      if (data?.snapshot && typeof data.snapshot === 'object') {
+        const snapshot = data.snapshot as any
+        if (snapshot.store && snapshot.schema) {
+          editor.store.loadSnapshot(snapshot)
+          console.log('📥 Canvas loaded')
+        }
+      } else {
+        console.log('📄 New canvas')
+      }
+    } catch (err) {
+      console.log('📄 New canvas')
+    }
   }
 
   const saveCanvas = async (editor: Editor) => {
@@ -86,9 +92,6 @@ export function InfiniteCanvas({ nodeId }: InfiniteCanvasProps) {
       <Tldraw 
         onMount={handleMount}
         key={nodeId}
-        // Clean UI like Overflow
-        hideUi={false}
-        // You can customize components here for even cleaner UI
       />
     </div>
   )

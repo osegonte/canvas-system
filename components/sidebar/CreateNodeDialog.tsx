@@ -6,7 +6,8 @@ import { NodeType } from '@/types/node.types'
 import { X } from 'lucide-react'
 
 interface CreateNodeDialogProps {
-  parentNode?: { id: string; type: NodeType; path: string[]; depth: number } | null
+  parentNode?: { id: string; type: NodeType; path: string[]; depth: number; workspace_id: string } | null
+  workspaceId?: string
   onClose: () => void
   onCreated: () => void
 }
@@ -16,7 +17,7 @@ const DOMAIN_TEMPLATES = ['Hardware', 'Software', 'Operations', 'Finance', 'Data
 const SYSTEM_TEMPLATES = ['Core System', 'Integration', 'Monitoring', 'Security']
 const FEATURE_TEMPLATES = ['Authentication', 'Data Sync', 'Reporting', 'Notifications']
 
-export function CreateNodeDialog({ parentNode, onClose, onCreated }: CreateNodeDialogProps) {
+export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }: CreateNodeDialogProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [showCustom, setShowCustom] = useState(false)
@@ -48,11 +49,16 @@ export function CreateNodeDialog({ parentNode, onClose, onCreated }: CreateNodeD
     try {
       const depth = parentNode ? parentNode.depth + 1 : 0
       const path = parentNode ? [...parentNode.path, parentNode.id] : []
+      const finalWorkspaceId = parentNode?.workspace_id || workspaceId
+
+      if (!finalWorkspaceId) {
+        throw new Error('No workspace ID provided')
+      }
 
       const { data: nodeData, error: nodeError } = await supabase
         .from('nodes')
         .insert({
-          workspace_id: '00000000-0000-0000-0000-000000000001',
+          workspace_id: finalWorkspaceId,
           parent_id: parentNode?.id || null,
           type,
           name,

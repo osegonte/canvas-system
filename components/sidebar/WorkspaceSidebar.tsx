@@ -5,21 +5,37 @@ import { supabase } from '@/lib/supabase/client'
 import { Node } from '@/types/node.types'
 import { FolderTree } from './FolderTree'
 import { CreateNodeDialog } from './CreateNodeDialog'
-import { Plus } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 
 interface WorkspaceSidebarProps {
+  workspaceId: string
   selectedNodeId: string | null
   onNodeSelect: (nodeId: string) => void
 }
 
-export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ workspaceId, selectedNodeId, onNodeSelect }: WorkspaceSidebarProps) {
   const [nodes, setNodes] = useState<Node[]>([])
+  const [filteredNodes, setFilteredNodes] = useState<Node[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     loadNodes()
-  }, [])
+  }, [workspaceId])
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      const filtered = nodes.filter(node => 
+        node.name.toLowerCase().includes(query) ||
+        node.description?.toLowerCase().includes(query)
+      )
+      setFilteredNodes(filtered)
+    } else {
+      setFilteredNodes(nodes)
+    }
+  }, [searchQuery, nodes])
 
   async function loadNodes() {
     setLoading(true)
@@ -27,12 +43,14 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
     const { data, error } = await supabase
       .from('nodes')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true })
 
     if (error) {
       console.error('Error loading nodes:', error)
     } else if (data) {
       setNodes(data as Node[])
+      setFilteredNodes(data as Node[])
     }
     
     setLoading(false)
@@ -43,7 +61,7 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
       <div className="w-64 border-r h-screen flex flex-col bg-gray-50">
         {/* Header */}
         <div className="p-4 border-b bg-white">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-gray-800">Projects</h2>
             <button
               onClick={() => setShowCreateDialog(true)}
@@ -52,6 +70,26 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
             >
               <Plus className="w-5 h-5 text-gray-600" />
             </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search nodes..."
+              className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-3 h-3 text-gray-400" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -63,10 +101,11 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
             </div>
           ) : (
             <FolderTree
-              nodes={nodes}
+              nodes={filteredNodes}
               currentNodeId={selectedNodeId}
               onNodeClick={onNodeSelect}
               onNodeCreated={loadNodes}
+              searchQuery={searchQuery}
             />
           )}
         </div>
@@ -74,7 +113,7 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
         {/* Footer */}
         <div className="p-4 border-t bg-white">
           <div className="text-xs text-gray-500">
-            {nodes.length} {nodes.length === 1 ? 'node' : 'nodes'}
+            {searchQuery ? `${filteredNodes.length} of ${nodes.length}` : `${nodes.length}`} {nodes.length === 1 ? 'node' : 'nodes'}
           </div>
         </div>
       </div>
@@ -83,6 +122,7 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
       {showCreateDialog && (
         <CreateNodeDialog
           parentNode={null}
+          workspaceId={workspaceId}
           onClose={() => setShowCreateDialog(false)}
           onCreated={() => {
             loadNodes()
