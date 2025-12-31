@@ -3,15 +3,18 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react'
 import { Node } from '@/types/node.types'
+import { CreateNodeDialog } from './CreateNodeDialog'
 
 interface FolderTreeProps {
   nodes: Node[]
   currentNodeId: string | null
   onNodeClick: (nodeId: string) => void
+  onNodeCreated: () => void
 }
 
-export function FolderTree({ nodes, currentNodeId, onNodeClick }: FolderTreeProps) {
+export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated }: FolderTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [creatingChildFor, setCreatingChildFor] = useState<Node | null>(null)
 
   const toggleExpanded = (nodeId: string) => {
     const newSet = new Set(expandedNodes)
@@ -25,6 +28,13 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick }: FolderTreeProp
 
   const getChildren = (parentId: string | null) => {
     return nodes.filter(n => n.parent_id === parentId)
+  }
+
+  const handleDoubleClick = (node: Node) => {
+    // Only allow adding children if not a component (leaf node)
+    if (node.type !== 'component') {
+      setCreatingChildFor(node)
+    }
   }
 
   const renderNode = (node: Node, depth: number = 0) => {
@@ -44,6 +54,8 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick }: FolderTreeProp
           `}
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
           onClick={() => onNodeClick(node.id)}
+          onDoubleClick={() => handleDoubleClick(node)}
+          title="Double-click to add child"
         >
           {/* Expand/collapse button */}
           {hasChildren ? (
@@ -75,20 +87,6 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick }: FolderTreeProp
           <span className="text-sm font-medium truncate flex-1">
             {node.name}
           </span>
-
-          {/* Status badge */}
-          {node.status !== 'idea' && (
-            <span className={`
-              text-xs px-1.5 py-0.5 rounded flex-shrink-0
-              ${node.status === 'complete' ? 'bg-green-100 text-green-700' : ''}
-              ${node.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' : ''}
-              ${node.status === 'mvp' ? 'bg-blue-100 text-blue-700' : ''}
-              ${node.status === 'testing' ? 'bg-purple-100 text-purple-700' : ''}
-              ${node.status === 'planned' ? 'bg-gray-100 text-gray-700' : ''}
-            `}>
-              {node.status}
-            </span>
-          )}
         </div>
 
         {/* Children */}
@@ -104,13 +102,32 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick }: FolderTreeProp
   const rootNodes = getChildren(null)
 
   return (
-    <div className="py-2">
-      {rootNodes.map(node => renderNode(node))}
-      {rootNodes.length === 0 && (
-        <div className="text-center text-gray-500 text-sm py-8 px-4">
-          No projects yet. Create one to get started!
-        </div>
+    <>
+      <div className="py-2">
+        {rootNodes.map(node => renderNode(node))}
+        {rootNodes.length === 0 && (
+          <div className="text-center text-gray-500 text-sm py-8 px-4">
+            No projects yet. Create one to get started!
+          </div>
+        )}
+      </div>
+
+      {/* Create child dialog */}
+      {creatingChildFor && (
+        <CreateNodeDialog
+          parentNode={{
+            id: creatingChildFor.id,
+            type: creatingChildFor.type,
+            path: creatingChildFor.path,
+            depth: creatingChildFor.depth
+          }}
+          onClose={() => setCreatingChildFor(null)}
+          onCreated={() => {
+            onNodeCreated()
+            setCreatingChildFor(null)
+          }}
+        />
       )}
-    </div>
+    </>
   )
 }

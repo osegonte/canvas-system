@@ -66,6 +66,7 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
               nodes={nodes}
               currentNodeId={selectedNodeId}
               onNodeClick={onNodeSelect}
+              onNodeCreated={loadNodes}
             />
           )}
         </div>
@@ -78,7 +79,7 @@ export function WorkspaceSidebar({ selectedNodeId, onNodeSelect }: WorkspaceSide
         </div>
       </div>
 
-      {/* Create Node Dialog */}
+      {/* Create root project dialog */}
       {showCreateDialog && (
         <CreateNodeDialog
           parentNode={null}

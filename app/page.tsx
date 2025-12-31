@@ -6,11 +6,17 @@ import { NodeView } from '@/components/NodeView'
 
 export default function HomePage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const handleNodeCreated = () => {
+    setRefreshKey(prev => prev + 1)
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <WorkspaceSidebar
+        key={refreshKey}
         selectedNodeId={selectedNodeId}
         onNodeSelect={setSelectedNodeId}
       />
@@ -18,7 +24,10 @@ export default function HomePage() {
       {/* Main content */}
       <main className="flex-1 overflow-hidden">
         {selectedNodeId ? (
-          <NodeView nodeId={selectedNodeId} />
+          <NodeView 
+            nodeId={selectedNodeId} 
+            onNodeCreated={handleNodeCreated}
+          />
         ) : (
           <div className="flex items-center justify-center h-full bg-gray-50">
             <div className="text-center">
