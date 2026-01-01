@@ -7,7 +7,7 @@ import { WorkspaceSidebar } from '@/components/sidebar/WorkspaceSidebar'
 import { NodeView } from '@/components/NodeView'
 import { WorkspaceSelector } from '@/components/WorkspaceSelector'
 import { LogOut } from 'lucide-react'
-
+export const dynamic = 'force-dynamic'
 export default function HomePage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
