@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { ChevronDown, Plus, Check } from 'lucide-react'
+import { ChevronDown, Plus, Check, Settings } from 'lucide-react'
+import { WorkspaceSettings } from './WorkspaceSettings'
 
 interface Workspace {
   id: string
@@ -19,10 +20,20 @@ export function WorkspaceSelector({ currentWorkspaceId, onWorkspaceChange }: Wor
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     loadWorkspaces()
+    loadUser()
   }, [])
+
+  async function loadUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setUser(user)
+    }
+  }
 
   async function loadWorkspaces() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -42,62 +53,74 @@ export function WorkspaceSelector({ currentWorkspaceId, onWorkspaceChange }: Wor
   const currentWorkspace = workspaces.find(w => w.id === currentWorkspaceId)
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-      >
-        <span className="font-medium text-gray-900">
-          {currentWorkspace?.name || 'Select workspace'}
-        </span>
-        <ChevronDown className="w-4 h-4 text-gray-500" />
-      </button>
+    <>
+      <div className="relative flex items-center gap-2">
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          <span className="font-medium text-gray-900">
+            {currentWorkspace?.name || 'Select workspace'}
+          </span>
+          <ChevronDown className="w-4 h-4 text-gray-500" />
+        </button>
 
-      {showDropdown && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setShowDropdown(false)}
-          />
-          <div className="absolute top-full mt-2 left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-            <div className="p-2">
-              {workspaces.map(workspace => (
+        {currentWorkspace && (
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-2 hover:bg-gray-100 rounded-md"
+            title="Workspace settings"
+          >
+            <Settings className="w-4 h-4 text-gray-600" />
+          </button>
+        )}
+
+        {showDropdown && (
+          <>
+            <div 
+              className="fixed inset-0 z-10" 
+              onClick={() => setShowDropdown(false)}
+            />
+            <div className="absolute top-full mt-2 left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+              <div className="p-2">
+                {workspaces.map(workspace => (
+                  <button
+                    key={workspace.id}
+                    onClick={() => {
+                      onWorkspaceChange(workspace.id)
+                      setShowDropdown(false)
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded"
+                  >
+                    <div className="flex-1 text-left">
+                      <div className="font-medium text-gray-900">{workspace.name}</div>
+                      {workspace.description && (
+                        <div className="text-xs text-gray-500">{workspace.description}</div>
+                      )}
+                    </div>
+                    {workspace.id === currentWorkspaceId && (
+                      <Check className="w-4 h-4 text-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="border-t p-2">
                 <button
-                  key={workspace.id}
                   onClick={() => {
-                    onWorkspaceChange(workspace.id)
+                    setShowCreateDialog(true)
                     setShowDropdown(false)
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded"
                 >
-                  <div className="flex-1 text-left">
-                    <div className="font-medium text-gray-900">{workspace.name}</div>
-                    {workspace.description && (
-                      <div className="text-xs text-gray-500">{workspace.description}</div>
-                    )}
-                  </div>
-                  {workspace.id === currentWorkspaceId && (
-                    <Check className="w-4 h-4 text-blue-600" />
-                  )}
+                  <Plus className="w-4 h-4" />
+                  <span className="font-medium">New workspace</span>
                 </button>
-              ))}
+              </div>
             </div>
-
-            <div className="border-t p-2">
-              <button
-                onClick={() => {
-                  setShowCreateDialog(true)
-                  setShowDropdown(false)
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="font-medium">New workspace</span>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {showCreateDialog && (
         <CreateWorkspaceDialog
@@ -109,7 +132,20 @@ export function WorkspaceSelector({ currentWorkspaceId, onWorkspaceChange }: Wor
           }}
         />
       )}
-    </div>
+
+      {showSettings && currentWorkspace && user && (
+        <WorkspaceSettings
+          workspaceId={currentWorkspace.id}
+          workspaceName={currentWorkspace.name}
+          currentUserId={user.id}
+          onClose={() => setShowSettings(false)}
+          onUpdated={() => {
+            loadWorkspaces()
+            setShowSettings(false)
+          }}
+        />
+      )}
+    </>
   )
 }
 
