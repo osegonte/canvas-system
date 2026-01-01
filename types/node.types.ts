@@ -14,7 +14,7 @@ export type NodeStatus =
 // Importance level
 export type NodeImportance = 'critical' | 'important' | 'optional'
 
-// The Node interface - matches your database schema
+// Add to existing Node interface
 export interface Node {
   id: string
   workspace_id: string
@@ -30,11 +30,16 @@ export interface Node {
   created_at: string
   updated_at: string
   created_by: string | null
-  auto_status: boolean  // ✅ Added
-  is_critical: boolean  // ✅ Added
+  auto_status: boolean
+  is_critical: boolean
+  
+  // ✅ NEW: AI metadata
+  ai_suggested: boolean
+  ai_confidence: number | null
+  confirmed: boolean
 }
 
-// For creating new nodes (subset of Node)
+// Update CreateNodeInput as well
 export interface CreateNodeInput {
   workspace_id: string
   parent_id: string | null
@@ -49,4 +54,9 @@ export interface CreateNodeInput {
   created_by?: string
   auto_status?: boolean
   is_critical?: boolean
+  
+  // ✅ NEW: AI metadata
+  ai_suggested?: boolean
+  ai_confidence?: number
+  confirmed?: boolean
 }
