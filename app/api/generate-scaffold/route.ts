@@ -8,11 +8,6 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!
 })
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 interface GenerateScaffoldRequest {
   description: string
   workspaceId: string
@@ -31,6 +26,12 @@ export async function POST(request: Request) {
       )
     }
 
+    // Create Supabase client with service role for server-side operations
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
     // Detect industry
     const industry = detectIndustry(description)
     console.log('🔍 Detected industry:', industry)
@@ -41,9 +42,9 @@ export async function POST(request: Request) {
 
     // Call Anthropic API
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514', // Latest model
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
-      temperature: 0.3, // Lower = more consistent
+      temperature: 0.3,
       messages: [{
         role: 'user',
         content: prompt
@@ -58,10 +59,8 @@ export async function POST(request: Request) {
 
     let scaffoldData
     try {
-      // Try to parse the response as JSON
       scaffoldData = JSON.parse(content.text)
     } catch (parseError) {
-      // If parsing fails, try to extract JSON from markdown code blocks
       const jsonMatch = content.text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
       if (jsonMatch) {
         scaffoldData = JSON.parse(jsonMatch[1])
@@ -72,7 +71,7 @@ export async function POST(request: Request) {
 
     console.log('✅ AI generated scaffold:', scaffoldData)
 
-    // Create project node in database
+    // Create project node
     const { data: projectNode, error: projectError } = await supabase
       .from('nodes')
       .insert({
@@ -85,7 +84,7 @@ export async function POST(request: Request) {
         status: 'idea',
         auto_status: true,
         is_critical: true,
-        ai_suggested: false, // Project itself is not AI-suggested
+        ai_suggested: false,
         confirmed: true
       })
       .select()
@@ -98,11 +97,10 @@ export async function POST(request: Request) {
 
     console.log('📦 Created project:', projectNode.id)
 
-    // Create domain, subdomain, and system nodes
+    // Create ghost nodes
     const createdNodes = []
 
     for (const domain of scaffoldData.domains) {
-      // Create domain (as ghost node)
       const { data: domainNode, error: domainError } = await supabase
         .from('nodes')
         .insert({
@@ -118,7 +116,7 @@ export async function POST(request: Request) {
           is_critical: true,
           ai_suggested: true,
           ai_confidence: 0.9,
-          confirmed: false // Ghost node!
+          confirmed: false
         })
         .select()
         .single()
@@ -130,14 +128,13 @@ export async function POST(request: Request) {
 
       createdNodes.push(domainNode)
 
-      // Create subdomains under this domain
       for (const subdomain of domain.subdomains) {
         const { data: subdomainNode, error: subdomainError } = await supabase
           .from('nodes')
           .insert({
             workspace_id: workspaceId,
             parent_id: domainNode.id,
-            type: 'system', // Subdomains become "systems" in our hierarchy
+            type: 'system',
             name: subdomain.name,
             description: null,
             path: [projectNode.id, domainNode.id],
@@ -147,7 +144,7 @@ export async function POST(request: Request) {
             is_critical: true,
             ai_suggested: true,
             ai_confidence: 0.85,
-            confirmed: false // Ghost node!
+            confirmed: false
           })
           .select()
           .single()
@@ -159,14 +156,13 @@ export async function POST(request: Request) {
 
         createdNodes.push(subdomainNode)
 
-        // Create systems under this subdomain
         for (const system of subdomain.systems || []) {
           const { data: systemNode, error: systemError } = await supabase
             .from('nodes')
             .insert({
               workspace_id: workspaceId,
               parent_id: subdomainNode.id,
-              type: 'feature', // Systems become "features" in our hierarchy
+              type: 'feature',
               name: system.name,
               description: null,
               path: [projectNode.id, domainNode.id, subdomainNode.id],
@@ -176,7 +172,7 @@ export async function POST(request: Request) {
               is_critical: system.isCritical,
               ai_suggested: true,
               ai_confidence: 0.8,
-              confirmed: false // Ghost node!
+              confirmed: false
             })
             .select()
             .single()
@@ -202,10 +198,11 @@ export async function POST(request: Request) {
       ghostNodesCount: createdNodes.length
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error generating scaffold:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate scaffold'
     return NextResponse.json(
-      { error: error.message || 'Failed to generate scaffold' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
