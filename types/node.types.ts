@@ -30,6 +30,8 @@ export interface Node {
   created_at: string
   updated_at: string
   created_by: string | null
+  auto_status: boolean  // ✅ Added
+  is_critical: boolean  // ✅ Added
 }
 
 // For creating new nodes (subset of Node)
@@ -45,6 +47,6 @@ export interface CreateNodeInput {
   importance?: NodeImportance
   owner_id?: string
   created_by?: string
-  auto_status: boolean  // Add this
-  is_critical: boolean  // Add this
+  auto_status?: boolean
+  is_critical?: boolean
 }
