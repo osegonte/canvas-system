@@ -45,4 +45,6 @@ export interface CreateNodeInput {
   importance?: NodeImportance
   owner_id?: string
   created_by?: string
+  auto_status: boolean  // Add this
+  is_critical: boolean  // Add this
 }

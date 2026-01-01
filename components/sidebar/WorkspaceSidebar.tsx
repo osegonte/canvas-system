@@ -6,6 +6,7 @@ import { Node } from '@/types/node.types'
 import { FolderTree } from './FolderTree'
 import { CreateNodeDialog } from './CreateNodeDialog'
 import { Plus, Search, X } from 'lucide-react'
+import { getUserRole, canEdit, type Role } from '@/lib/permissions'
 
 interface WorkspaceSidebarProps {
   workspaceId: string
@@ -19,9 +20,11 @@ export function WorkspaceSidebar({ workspaceId, selectedNodeId, onNodeSelect }: 
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [userRole, setUserRole] = useState<Role | null>(null)
 
   useEffect(() => {
     loadNodes()
+    loadRole()
   }, [workspaceId])
 
   useEffect(() => {
@@ -36,6 +39,11 @@ export function WorkspaceSidebar({ workspaceId, selectedNodeId, onNodeSelect }: 
       setFilteredNodes(nodes)
     }
   }, [searchQuery, nodes])
+
+  async function loadRole() {
+    const role = await getUserRole(workspaceId)
+    setUserRole(role)
+  }
 
   async function loadNodes() {
     setLoading(true)
@@ -63,13 +71,15 @@ export function WorkspaceSidebar({ workspaceId, selectedNodeId, onNodeSelect }: 
         <div className="p-4 border-b bg-white">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-gray-800">Projects</h2>
-            <button
-              onClick={() => setShowCreateDialog(true)}
-              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-              title="New Project"
-            >
-              <Plus className="w-5 h-5 text-gray-600" />
-            </button>
+            {canEdit(userRole) && (
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                title="New Project"
+              >
+                <Plus className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
           </div>
 
           {/* Search */}
@@ -106,6 +116,7 @@ export function WorkspaceSidebar({ workspaceId, selectedNodeId, onNodeSelect }: 
               onNodeClick={onNodeSelect}
               onNodeCreated={loadNodes}
               searchQuery={searchQuery}
+              userRole={userRole}
             />
           )}
         </div>
@@ -115,6 +126,11 @@ export function WorkspaceSidebar({ workspaceId, selectedNodeId, onNodeSelect }: 
           <div className="text-xs text-gray-500">
             {searchQuery ? `${filteredNodes.length} of ${nodes.length}` : `${nodes.length}`} {nodes.length === 1 ? 'node' : 'nodes'}
           </div>
+          {userRole && (
+            <div className="text-xs text-gray-400 mt-1 capitalize">
+              Role: {userRole}
+            </div>
+          )}
         </div>
       </div>
 

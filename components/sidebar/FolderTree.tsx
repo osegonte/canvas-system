@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronRight, ChevronDown, FolderKanban, Boxes, Package, Puzzle, Component } from 'lucide-react'
 import { Node } from '@/types/node.types'
 import { CreateNodeDialog } from './CreateNodeDialog'
+import { canEdit, type Role } from '@/lib/permissions'
+import { getNodeProgress } from '@/lib/status-aggregation'
 
 interface FolderTreeProps {
   nodes: Node[]
@@ -11,6 +13,7 @@ interface FolderTreeProps {
   onNodeClick: (nodeId: string) => void
   onNodeCreated: () => void
   searchQuery?: string
+  userRole?: Role | null
 }
 
 const NODE_ICONS = {
@@ -29,9 +32,31 @@ const NODE_COLORS = {
   component: 'text-pink-600'
 }
 
-export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, searchQuery }: FolderTreeProps) {
+export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, searchQuery, userRole }: FolderTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [creatingChildFor, setCreatingChildFor] = useState<Node | null>(null)
+  const [nodeProgress, setNodeProgress] = useState<Record<string, { percentage: number, complete: number, total: number }>>({})
+
+  useEffect(() => {
+    loadProgress()
+  }, [nodes])
+
+  async function loadProgress() {
+    const progressMap: Record<string, { percentage: number, complete: number, total: number }> = {}
+    
+    for (const node of nodes) {
+      const stats = await getNodeProgress(node.id)
+      if (stats.total > 0) {
+        progressMap[node.id] = {
+          percentage: stats.percentage,
+          complete: stats.complete,
+          total: stats.total
+        }
+      }
+    }
+    
+    setNodeProgress(progressMap)
+  }
 
   const toggleExpanded = (nodeId: string) => {
     const newSet = new Set(expandedNodes)
@@ -48,7 +73,8 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, s
   }
 
   const handleDoubleClick = (node: Node) => {
-    if (node.type !== 'component') {
+    // Only allow adding children if user can edit AND node is not a component
+    if (node.type !== 'component' && canEdit(userRole)) {
       setCreatingChildFor(node)
     }
   }
@@ -61,6 +87,7 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, s
 
     const Icon = NODE_ICONS[node.type]
     const iconColor = NODE_COLORS[node.type]
+    const progress = nodeProgress[node.id]
 
     return (
       <div key={node.id}>
@@ -73,7 +100,7 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, s
           style={{ paddingLeft: `${depth * 20 + 8}px` }}
           onClick={() => onNodeClick(node.id)}
           onDoubleClick={() => handleDoubleClick(node)}
-          title="Double-click to add child"
+          title={canEdit(userRole) ? "Double-click to add child" : ""}
         >
           {hasChildren ? (
             <button
@@ -99,7 +126,23 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, s
             {node.name}
           </span>
 
-          {node.status !== 'idea' && (
+          {/* Progress bar - show if node has children */}
+          {progress && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 transition-all"
+                  style={{ width: `${progress.percentage}%` }}
+                />
+              </div>
+              <span className="text-xs text-gray-500 w-8 text-right">
+                {progress.complete}/{progress.total}
+              </span>
+            </div>
+          )}
+
+          {/* Status dot - only if no progress bar */}
+          {!progress && node.status !== 'idea' && (
             <div className={`
               w-2 h-2 rounded-full flex-shrink-0
               ${node.status === 'complete' ? 'bg-green-500' : ''}
@@ -141,9 +184,15 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, s
                 <div className="text-gray-600 text-sm font-medium mb-1">
                   No projects yet
                 </div>
-                <div className="text-gray-500 text-xs">
-                  Click the + button to create one
-                </div>
+                {canEdit(userRole) ? (
+                  <div className="text-gray-500 text-xs">
+                    Click the + button to create one
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-xs">
+                    Ask an owner or editor to create projects
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase/client'
 import { Node, NodeStatus } from '@/types/node.types'
 import { Edit2, Trash2, ChevronRight } from 'lucide-react'
 import { InfiniteCanvas } from './canvas/InfiniteCanvas'
+import { getUserRole, canEdit, type Role } from '@/lib/permissions'
+import { updateNodeStatusWithPropagation, enableAutoStatus, toggleNodeCritical, getNodeProgress } from '@/lib/status-aggregation'
 
 interface NodeViewProps {
   nodeId: string
@@ -17,6 +19,8 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
   const [loading, setLoading] = useState(true)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [userRole, setUserRole] = useState<Role | null>(null)
+  const [progress, setProgress] = useState({ total: 0, complete: 0, inProgress: 0, percentage: 0 })
 
   useEffect(() => {
     loadNode()
@@ -36,9 +40,19 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
     } else if (data) {
       setNode(data as Node)
       await loadBreadcrumbs(data as Node)
+      await loadRole(data.workspace_id)
+      
+      // Load progress stats
+      const stats = await getNodeProgress(data.id)
+      setProgress(stats)
     }
     
     setLoading(false)
+  }
+
+  async function loadRole(workspaceId: string) {
+    const role = await getUserRole(workspaceId)
+    setUserRole(role)
   }
 
   async function loadBreadcrumbs(currentNode: Node) {
@@ -62,21 +76,18 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
   }
 
   async function updateStatus(newStatus: NodeStatus) {
-    if (!node) return
+    if (!node || !canEdit(userRole)) return
 
-    const { error } = await supabase
-      .from('nodes')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', node.id)
-
-    if (!error) {
-      setNode({ ...node, status: newStatus })
-      onNodeCreated()
-    }
+    // Use propagation instead of direct update
+    await updateNodeStatusWithPropagation(node.id, newStatus)
+    
+    // Reload to see changes
+    await loadNode()
+    onNodeCreated() // Refresh sidebar
   }
 
   async function deleteNode() {
-    if (!node) return
+    if (!node || !canEdit(userRole)) return
 
     const { error } = await supabase
       .from('nodes')
@@ -85,9 +96,13 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
 
     if (!error) {
       onNodeCreated()
-      // Navigate to parent or home
       window.location.reload()
     }
+  }
+
+  const handleBreadcrumbClick = (crumbId: string) => {
+    const event = new CustomEvent('nodeSelect', { detail: crumbId })
+    window.dispatchEvent(event)
   }
 
   if (loading) {
@@ -118,7 +133,7 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
                 <div key={crumb.id} className="flex items-center gap-2">
                   {idx > 0 && <ChevronRight className="w-4 h-4" />}
                   <button
-                    onClick={() => window.location.href = `/?node=${crumb.id}`}
+                    onClick={() => handleBreadcrumbClick(crumb.id)}
                     className={`hover:text-blue-600 ${idx === breadcrumbs.length - 1 ? 'font-medium text-gray-900' : ''}`}
                   >
                     {crumb.name}
@@ -142,27 +157,103 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
 
           {/* Metadata row */}
           <div className="mt-4 flex items-center gap-4 text-sm flex-wrap">
-            {/* Status dropdown */}
-            <select
-              value={node.status}
-              onChange={(e) => updateStatus(e.target.value as NodeStatus)}
-              className={`
-                px-3 py-1 text-sm rounded-full font-medium border-2 cursor-pointer
-                ${node.status === 'complete' ? 'bg-green-100 text-green-700 border-green-300' : ''}
-                ${node.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''}
-                ${node.status === 'mvp' ? 'bg-blue-100 text-blue-700 border-blue-300' : ''}
-                ${node.status === 'testing' ? 'bg-purple-100 text-purple-700 border-purple-300' : ''}
-                ${node.status === 'planned' ? 'bg-gray-100 text-gray-700 border-gray-300' : ''}
-                ${node.status === 'idea' ? 'bg-gray-50 text-gray-600 border-gray-200' : ''}
-              `}
-            >
-              <option value="idea">Idea</option>
-              <option value="planned">Planned</option>
-              <option value="in_progress">In Progress</option>
-              <option value="mvp">MVP</option>
-              <option value="testing">Testing</option>
-              <option value="complete">Complete</option>
-            </select>
+            {/* Status dropdown or badge */}
+            {canEdit(userRole) ? (
+              <select
+                value={node.status}
+                onChange={(e) => updateStatus(e.target.value as NodeStatus)}
+                className={`
+                  px-3 py-1 text-sm rounded-full font-medium border-2 cursor-pointer
+                  ${node.status === 'complete' ? 'bg-green-100 text-green-700 border-green-300' : ''}
+                  ${node.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''}
+                  ${node.status === 'mvp' ? 'bg-blue-100 text-blue-700 border-blue-300' : ''}
+                  ${node.status === 'testing' ? 'bg-purple-100 text-purple-700 border-purple-300' : ''}
+                  ${node.status === 'planned' ? 'bg-gray-100 text-gray-700 border-gray-300' : ''}
+                  ${node.status === 'idea' ? 'bg-gray-50 text-gray-600 border-gray-200' : ''}
+                `}
+              >
+                <option value="idea">Idea</option>
+                <option value="planned">Planned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="mvp">MVP</option>
+                <option value="testing">Testing</option>
+                <option value="complete">Complete</option>
+              </select>
+            ) : (
+              <span className={`
+                px-3 py-1 text-sm rounded-full font-medium
+                ${node.status === 'complete' ? 'bg-green-100 text-green-700' : ''}
+                ${node.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' : ''}
+                ${node.status === 'mvp' ? 'bg-blue-100 text-blue-700' : ''}
+                ${node.status === 'testing' ? 'bg-purple-100 text-purple-700' : ''}
+                ${node.status === 'planned' ? 'bg-gray-100 text-gray-700' : ''}
+                ${node.status === 'idea' ? 'bg-gray-100 text-gray-600' : ''}
+              `}>
+                {node.status}
+              </span>
+            )}
+
+            {/* Progress indicator - show if node has children */}
+            {progress.total > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-600 transition-all"
+                    style={{ width: `${progress.percentage}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-600">
+                  {progress.complete}/{progress.total}
+                </span>
+              </div>
+            )}
+
+            {/* Auto-status toggle - only for editors */}
+            {canEdit(userRole) && node.auto_status !== undefined && (
+              <button
+                onClick={async () => {
+                  if (node.auto_status) {
+                    // Disable auto (allow manual override)
+                    await supabase
+                      .from('nodes')
+                      .update({ auto_status: false })
+                      .eq('id', node.id)
+                  } else {
+                    // Enable auto (re-calculate from children)
+                    await enableAutoStatus(node.id)
+                  }
+                  await loadNode()
+                  onNodeCreated()
+                }}
+                className={`text-xs px-2 py-1 rounded ${
+                  node.auto_status 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+                title={node.auto_status ? 'Auto-calculated from children' : 'Manual status override'}
+              >
+                {node.auto_status ? '🤖 Auto' : '✋ Manual'}
+              </button>
+            )}
+
+            {/* Critical toggle - only for editors */}
+            {canEdit(userRole) && node.is_critical !== undefined && node.parent_id && (
+              <button
+                onClick={async () => {
+                  await toggleNodeCritical(node.id)
+                  await loadNode()
+                  onNodeCreated()
+                }}
+                className={`text-xs px-2 py-1 rounded ${
+                  node.is_critical 
+                    ? 'bg-orange-100 text-orange-700' 
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+                title={node.is_critical ? 'Affects parent status' : 'Does not affect parent'}
+              >
+                {node.is_critical ? '⭐ Critical' : '○ Optional'}
+              </button>
+            )}
 
             <div className="text-gray-500">
               <span className="font-medium">Type:</span> {node.type}
@@ -183,24 +274,35 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               {new Date(node.created_at).toLocaleDateString()}
             </div>
 
-            {/* Edit & Delete buttons */}
-            <div className="ml-auto flex gap-2">
-              <button
-                onClick={() => setShowEditDialog(true)}
-                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Edit2 className="w-4 h-4" />
-                Edit
-              </button>
+            {/* Edit & Delete buttons - only for editors */}
+            {canEdit(userRole) && (
+              <div className="ml-auto flex gap-2">
+                <button
+                  onClick={() => setShowEditDialog(true)}
+                  className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Edit
+                </button>
 
-              <button
-                onClick={() => setShowDeleteDialog(true)}
-                className="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50 flex items-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
+                <button
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50 flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+
+            {/* Show read-only badge for viewers */}
+            {userRole === 'viewer' && (
+              <div className="ml-auto">
+                <span className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                  Read-only
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
