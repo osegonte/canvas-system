@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Node, NodeStatus } from '@/types/node.types'
 import { Edit2, Trash2, ChevronRight } from 'lucide-react'
 import { InfiniteCanvas } from './canvas/InfiniteCanvas'
+import { MindMapView } from './MindMapView'
 import { getUserRole, canEdit, type Role } from '@/lib/permissions'
 import { updateNodeStatusWithPropagation, enableAutoStatus, toggleNodeCritical, getNodeProgress } from '@/lib/status-aggregation'
 
@@ -155,6 +156,14 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             </p>
           )}
 
+          {/* Mind Map Visualization - Only for projects */}
+          {node.type === 'project' && (
+            <div className="mt-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-3">Project Structure</h3>
+              <MindMapView nodeId={node.id} />
+            </div>
+          )}
+
           {/* Metadata row */}
           <div className="mt-4 flex items-center gap-4 text-sm flex-wrap">
             {/* Status dropdown or badge */}
@@ -208,7 +217,7 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               </div>
             )}
 
-            {/* Auto-status toggle - only for editors */}
+            {/* Auto-status toggle - only for editors - NO EMOJI */}
             {canEdit(userRole) && node.auto_status !== undefined && (
               <button
                 onClick={async () => {
@@ -232,11 +241,11 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
                 }`}
                 title={node.auto_status ? 'Auto-calculated from children' : 'Manual status override'}
               >
-                {node.auto_status ? '🤖 Auto' : '✋ Manual'}
+                {node.auto_status ? 'Auto' : 'Manual'}
               </button>
             )}
 
-            {/* Critical toggle - only for editors */}
+            {/* Critical toggle - only for editors - NO EMOJI, just color dot */}
             {canEdit(userRole) && node.is_critical !== undefined && node.parent_id && (
               <button
                 onClick={async () => {
@@ -244,14 +253,17 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
                   await loadNode()
                   onNodeCreated()
                 }}
-                className={`text-xs px-2 py-1 rounded ${
+                className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
                   node.is_critical 
                     ? 'bg-orange-100 text-orange-700' 
                     : 'bg-gray-100 text-gray-700'
                 }`}
                 title={node.is_critical ? 'Affects parent status' : 'Does not affect parent'}
               >
-                {node.is_critical ? '⭐ Critical' : '○ Optional'}
+                <div className={`w-2 h-2 rounded-full ${
+                  node.is_critical ? 'bg-orange-500' : 'bg-gray-400'
+                }`} />
+                {node.is_critical ? 'Critical' : 'Optional'}
               </button>
             )}
 

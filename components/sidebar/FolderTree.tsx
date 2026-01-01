@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ChevronRight, ChevronDown, FolderKanban, Boxes, Package, Puzzle, Component } from 'lucide-react'
 import { Node } from '@/types/node.types'
 import { CreateNodeDialog } from './CreateNodeDialog'
@@ -141,16 +141,32 @@ export function FolderTree({ nodes, currentNodeId, onNodeClick, onNodeCreated, s
             </div>
           )}
 
-          {/* Status dot - only if no progress bar */}
-          {!progress && node.status !== 'idea' && (
-            <div className={`
-              w-2 h-2 rounded-full flex-shrink-0
-              ${node.status === 'complete' ? 'bg-green-500' : ''}
-              ${node.status === 'in_progress' ? 'bg-yellow-500' : ''}
-              ${node.status === 'mvp' ? 'bg-blue-500' : ''}
-              ${node.status === 'testing' ? 'bg-purple-500' : ''}
-              ${node.status === 'planned' ? 'bg-gray-400' : ''}
-            `} />
+          {/* Status & Critical Indicators - USE COLOR DOTS, NO TEXT */}
+          {!progress && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Critical dot - Orange for critical */}
+              {node.is_critical && (
+                <div 
+                  className="w-2 h-2 rounded-full bg-orange-500" 
+                  title="Critical - affects parent status"
+                />
+              )}
+              
+              {/* Status dot - only if status is not idea */}
+              {node.status !== 'idea' && (
+                <div 
+                  className={`
+                    w-2 h-2 rounded-full
+                    ${node.status === 'complete' ? 'bg-green-500' : ''}
+                    ${node.status === 'in_progress' ? 'bg-yellow-500' : ''}
+                    ${node.status === 'mvp' ? 'bg-blue-500' : ''}
+                    ${node.status === 'testing' ? 'bg-purple-500' : ''}
+                    ${node.status === 'planned' ? 'bg-gray-400' : ''}
+                  `}
+                  title={`Status: ${node.status}`}
+                />
+              )}
+            </div>
           )}
         </div>
 
