@@ -3,15 +3,21 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { getUserProfile } from '@/lib/user-profile'
+import { UserProfile } from '@/types/user.types'
 import { WorkspaceSidebar } from '@/components/sidebar/WorkspaceSidebar'
 import { NodeView } from '@/components/NodeView'
 import { WorkspaceSelector } from '@/components/WorkspaceSelector'
+import { ContributorDashboard } from '@/components/dashboards/ContributorDashboard'
 import { LogOut } from 'lucide-react'
+
 export const dynamic = 'force-dynamic'
+
 export default function HomePage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -29,12 +35,17 @@ export default function HomePage() {
     }
 
     setUser(user)
+    
+    // Load user profile
+    const userProfile = await getUserProfile()
+    console.log('User profile loaded:', userProfile)
+    setProfile(userProfile)
+
     await ensureWorkspace(user.id)
     setLoading(false)
   }
 
   async function ensureWorkspace(userId: string) {
-    // Check if user has any workspaces
     const { data: workspaces } = await supabase
       .from('workspaces')
       .select('*')
@@ -44,7 +55,6 @@ export default function HomePage() {
     if (workspaces && workspaces.length > 0) {
       setCurrentWorkspaceId(workspaces[0].id)
     } else {
-      // Create default workspace
       const { data: newWorkspace } = await supabase
         .from('workspaces')
         .insert({
@@ -73,8 +83,8 @@ export default function HomePage() {
 
   const handleWorkspaceChange = (workspaceId: string) => {
     setCurrentWorkspaceId(workspaceId)
-    setSelectedNodeId(null) // Clear selection when switching workspaces
-    setRefreshKey(prev => prev + 1) // Refresh sidebar
+    setSelectedNodeId(null)
+    setRefreshKey(prev => prev + 1)
   }
 
   if (loading || !currentWorkspaceId) {
@@ -84,6 +94,9 @@ export default function HomePage() {
       </div>
     )
   }
+
+  // Show dashboard if no node selected AND user has a profile
+  const showDashboard = !selectedNodeId && profile
 
   return (
     <div className="flex h-screen overflow-hidden flex-col">
@@ -121,21 +134,26 @@ export default function HomePage() {
           onNodeSelect={setSelectedNodeId}
         />
 
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden bg-gray-50">
           {selectedNodeId ? (
             <NodeView 
               nodeId={selectedNodeId} 
               onNodeCreated={handleNodeCreated}
             />
+          ) : showDashboard ? (
+            <ContributorDashboard 
+              workspaceId={currentWorkspaceId}
+              profile={profile}
+            />
           ) : (
-            <div className="flex items-center justify-center h-full bg-gray-50">
+            <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="text-6xl mb-4">👋</div>
                 <h2 className="text-2xl font-semibold text-gray-700 mb-2">
-                  Welcome to Canvas Project System
+                  Welcome to Canvas
                 </h2>
                 <p className="text-gray-500">
-                  Select a node from the sidebar or create a new project to get started
+                  {profile ? 'Loading dashboard...' : 'Setting up your profile...'}
                 </p>
               </div>
             </div>
