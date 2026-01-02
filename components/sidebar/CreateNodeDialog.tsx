@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { NodeType } from '@/types/node.types'
-import { X } from 'lucide-react'
+import { X, Sparkles } from 'lucide-react'
 
 interface CreateNodeDialogProps {
   parentNode?: { id: string; type: NodeType; path: string[]; depth: number; workspace_id: string } | null
@@ -17,6 +17,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [useAI, setUseAI] = useState(false)
   
   const type: NodeType = 
     parentNode?.type === 'project' ? 'domain' :
@@ -24,21 +25,47 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
     parentNode?.type === 'system' ? 'feature' :
     parentNode?.type === 'feature' ? 'component' : 'project'
 
+  const isProjectCreation = type === 'project'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const depth = parentNode ? parentNode.depth + 1 : 0
-      const path = parentNode ? [...parentNode.path, parentNode.id] : []
       const finalWorkspaceId = parentNode?.workspace_id || workspaceId
 
       if (!finalWorkspaceId) {
         throw new Error('No workspace ID provided')
       }
 
-      // Create node
+      // If AI is enabled and it's a project, use scaffold API
+      if (useAI && isProjectCreation && description.trim()) {
+        const response = await fetch('/api/generate-scaffold', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description,
+            projectName: name || undefined,
+            workspaceId: finalWorkspaceId
+          })
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to generate scaffold')
+        }
+
+        onCreated()
+        onClose()
+        return
+      }
+
+      // Otherwise, manual creation
+      const depth = parentNode ? parentNode.depth + 1 : 0
+      const path = parentNode ? [...parentNode.path, parentNode.id] : []
+
       const { data: nodeData, error: nodeError } = await supabase
         .from('nodes')
         .insert({
@@ -72,7 +99,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
 
       if (canvasError) throw canvasError
 
-      // Auto-generate skills in background (don't wait)
+      // Auto-generate skills in background
       if (type === 'feature' || type === 'system') {
         generateSkillsInBackground(nodeData.id, name, type, description || undefined)
       }
@@ -101,7 +128,6 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
       })
     } catch (error) {
       console.error('Background skills generation failed:', error)
-      // Silent fail - skills can be regenerated later
     }
   }
 
@@ -127,33 +153,57 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-bold mb-2 text-gray-900">
-                Name <span className="text-red-500">*</span>
+                Name {!useAI && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
-                placeholder="Enter name..."
-                required
+                placeholder={useAI ? "Leave blank for AI to name it" : "Enter name..."}
+                required={!useAI}
                 autoFocus
               />
             </div>
 
             <div>
               <label className="block text-sm font-bold mb-2 text-gray-900">
-                Description (optional)
+                Description {useAI && <span className="text-red-500">*</span>}
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
                 rows={3}
-                placeholder="Describe this component..."
+                placeholder={useAI ? "Describe your project in detail..." : "Describe this component..."}
+                required={useAI}
               />
             </div>
 
-            {(type === 'feature' || type === 'system') && (
+            {/* Auto-generate option - ONLY for projects */}
+            {isProjectCreation && (
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useAI}
+                    onChange={(e) => setUseAI(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-blue-900">
+                      <Sparkles className="w-4 h-4" />
+                      Auto-generate structure with AI
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1">
+                      AI will analyze your description and create domains, systems, and features automatically
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {(type === 'feature' || type === 'system') && !useAI && (
               <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
                 💡 Skills will be auto-generated after creation
               </div>
@@ -173,7 +223,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
                 disabled={loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Create'}
+                {loading ? (useAI ? 'Generating...' : 'Creating...') : 'Create'}
               </button>
             </div>
           </form>

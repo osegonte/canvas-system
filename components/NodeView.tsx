@@ -95,7 +95,17 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
 
     if (!error) {
       onNodeCreated()
-      window.location.reload()
+      // Navigate to parent instead of reloading
+      if (node.parent_id) {
+        const event = new CustomEvent('nodeSelect', { detail: node.parent_id })
+        window.dispatchEvent(event)
+      } else {
+        // If root node deleted, deselect
+        const event = new CustomEvent('nodeSelect', { detail: null })
+        window.dispatchEvent(event)
+      }
+    } else {
+      alert('Failed to delete node: ' + error.message)
     }
   }
 
@@ -223,7 +233,7 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               </div>
             )}
 
-            {canEdit(userRole) && node.auto_status !== undefined && (
+            {node.auto_status !== undefined && (
               <button
                 onClick={async () => {
                   if (node.auto_status) {

@@ -3,13 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { getUserProfile } from '@/lib/user-profile'
-import { UserProfile } from '@/types/user.types'
 import { WorkspaceSidebar } from '@/components/sidebar/WorkspaceSidebar'
 import { NodeView } from '@/components/NodeView'
 import { WorkspaceSelector } from '@/components/WorkspaceSelector'
-import { ContributorDashboard } from '@/components/dashboards/ContributorDashboard'
-import { LogOut } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +14,9 @@ export default function HomePage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -35,12 +32,6 @@ export default function HomePage() {
     }
 
     setUser(user)
-    
-    // Load user profile
-    const userProfile = await getUserProfile()
-    console.log('User profile loaded:', userProfile)
-    setProfile(userProfile)
-
     await ensureWorkspace(user.id)
     setLoading(false)
   }
@@ -95,9 +86,6 @@ export default function HomePage() {
     )
   }
 
-  // Show dashboard if no node selected AND user has a profile
-  const showDashboard = !selectedNodeId && profile
-
   return (
     <div className="flex h-screen overflow-hidden flex-col">
       {/* Top bar */}
@@ -126,24 +114,46 @@ export default function HomePage() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        <WorkspaceSidebar
-          key={`${refreshKey}-${currentWorkspaceId}`}
-          workspaceId={currentWorkspaceId}
-          selectedNodeId={selectedNodeId}
-          onNodeSelect={setSelectedNodeId}
-        />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile hamburger button */}
+        <button
+          onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+          className="md:hidden fixed bottom-4 right-4 z-50 p-3 bg-blue-600 text-white rounded-full shadow-lg"
+        >
+          {showMobileSidebar ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+
+        {/* Mobile overlay */}
+        {showMobileSidebar && (
+          <div 
+            className="md:hidden fixed inset-0 bg-black/50 z-30"
+            onClick={() => setShowMobileSidebar(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <div className={`
+          fixed md:relative inset-y-0 left-0 z-40
+          transform transition-transform duration-200 ease-in-out
+          ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0
+        `}>
+          <WorkspaceSidebar
+            key={`${refreshKey}-${currentWorkspaceId}`}
+            workspaceId={currentWorkspaceId}
+            selectedNodeId={selectedNodeId}
+            onNodeSelect={(id) => {
+              setSelectedNodeId(id)
+              setShowMobileSidebar(false)
+            }}
+          />
+        </div>
 
         <main className="flex-1 overflow-hidden bg-gray-50">
           {selectedNodeId ? (
             <NodeView 
               nodeId={selectedNodeId} 
               onNodeCreated={handleNodeCreated}
-            />
-          ) : showDashboard ? (
-            <ContributorDashboard 
-              workspaceId={currentWorkspaceId}
-              profile={profile}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -153,7 +163,7 @@ export default function HomePage() {
                   Welcome to Canvas
                 </h2>
                 <p className="text-gray-500">
-                  {profile ? 'Loading dashboard...' : 'Setting up your profile...'}
+                  Select a project from the sidebar to get started
                 </p>
               </div>
             </div>
