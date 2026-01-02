@@ -233,30 +233,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               </div>
             )}
 
-            {node.auto_status !== undefined && (
-              <button
-                onClick={async () => {
-                  if (node.auto_status) {
-                    await supabase
-                      .from('nodes')
-                      .update({ auto_status: false })
-                      .eq('id', node.id)
-                  } else {
-                    await enableAutoStatus(node.id)
-                  }
-                  await loadNode()
-                  onNodeCreated()
-                }}
-                className={`text-xs px-2 py-1 rounded ${
-                  node.auto_status 
-                    ? 'bg-green-100 text-green-700' 
-                    : 'bg-gray-100 text-gray-700'
-                }`}
-              >
-                {node.auto_status ? 'Auto' : 'Manual'}
-              </button>
-            )}
-
             {canEdit(userRole) && node.is_critical !== undefined && node.parent_id && (
               <button
                 onClick={async () => {

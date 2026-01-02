@@ -1,7 +1,5 @@
-// Types of nodes in the hierarchy
 export type NodeType = 'project' | 'domain' | 'system' | 'feature' | 'component'
 
-// Status a node can be in
 export type NodeStatus = 
   | 'idea' 
   | 'planned' 
@@ -11,10 +9,8 @@ export type NodeStatus =
   | 'complete' 
   | 'archived'
 
-// Importance level
 export type NodeImportance = 'critical' | 'important' | 'optional'
 
-// Node interface
 export interface Node {
   id: string
   workspace_id: string
@@ -30,20 +26,11 @@ export interface Node {
   created_at: string
   updated_at: string
   created_by: string | null
-  auto_status: boolean
   is_critical: boolean
-  
-  // AI metadata
-  ai_suggested: boolean
-  ai_confidence: number | null
-  confirmed: boolean
-  
-  // NEW FIELDS
   skills: string[]
   coordinator_role: string | null
 }
 
-// CreateNodeInput interface
 export interface CreateNodeInput {
   workspace_id: string
   parent_id: string | null
@@ -56,15 +43,7 @@ export interface CreateNodeInput {
   importance?: NodeImportance
   owner_id?: string
   created_by?: string
-  auto_status?: boolean
   is_critical?: boolean
-  
-  // AI metadata
-  ai_suggested?: boolean
-  ai_confidence?: number
-  confirmed?: boolean
-  
-  // NEW FIELDS
   skills?: string[]
   coordinator_role?: string
 }

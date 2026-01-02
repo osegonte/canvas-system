@@ -26,21 +26,17 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create Supabase client with service role for server-side operations
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
 
-    // Detect industry
     const industry = detectIndustry(description)
     console.log('🔍 Detected industry:', industry)
 
-    // Build AI prompt
     const prompt = buildScaffoldPrompt(description, industry)
     console.log('📝 Prompt built, calling AI...')
 
-    // Call Anthropic API
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
@@ -51,7 +47,6 @@ export async function POST(request: Request) {
       }]
     })
 
-    // Extract JSON from response
     const content = message.content[0]
     if (content.type !== 'text') {
       throw new Error('Unexpected response type from AI')
@@ -71,7 +66,6 @@ export async function POST(request: Request) {
 
     console.log('✅ AI generated scaffold:', scaffoldData)
 
-    // Create project node
     const { data: projectNode, error: projectError } = await supabase
       .from('nodes')
       .insert({
@@ -82,10 +76,9 @@ export async function POST(request: Request) {
         path: [],
         depth: 0,
         status: 'idea',
-        auto_status: true,
         is_critical: true,
-        ai_suggested: false,
-        confirmed: true
+        skills: [],
+        coordinator_role: null
       })
       .select()
       .single()
@@ -97,7 +90,6 @@ export async function POST(request: Request) {
 
     console.log('📦 Created project:', projectNode.id)
 
-    // Create ghost nodes
     const createdNodes = []
 
     for (const domain of scaffoldData.domains) {
@@ -112,11 +104,9 @@ export async function POST(request: Request) {
           path: [projectNode.id],
           depth: 1,
           status: 'idea',
-          auto_status: true,
           is_critical: true,
-          ai_suggested: true,
-          ai_confidence: 0.9,
-          confirmed: false
+          skills: [],
+          coordinator_role: null
         })
         .select()
         .single()
@@ -140,11 +130,9 @@ export async function POST(request: Request) {
             path: [projectNode.id, domainNode.id],
             depth: 2,
             status: 'idea',
-            auto_status: true,
             is_critical: true,
-            ai_suggested: true,
-            ai_confidence: 0.85,
-            confirmed: false
+            skills: [],
+            coordinator_role: null
           })
           .select()
           .single()
@@ -168,11 +156,9 @@ export async function POST(request: Request) {
               path: [projectNode.id, domainNode.id, subdomainNode.id],
               depth: 3,
               status: 'idea',
-              auto_status: true,
               is_critical: system.isCritical,
-              ai_suggested: true,
-              ai_confidence: 0.8,
-              confirmed: false
+              skills: [],
+              coordinator_role: null
             })
             .select()
             .single()
@@ -187,7 +173,7 @@ export async function POST(request: Request) {
       }
     }
 
-    console.log(`✅ Created ${createdNodes.length} ghost nodes`)
+    console.log(`✅ Created ${createdNodes.length} nodes`)
 
     return NextResponse.json({
       success: true,
@@ -195,7 +181,7 @@ export async function POST(request: Request) {
       projectName: projectNode.name,
       summary: scaffoldData.projectSummary,
       industry: scaffoldData.industry,
-      ghostNodesCount: createdNodes.length
+      nodesCount: createdNodes.length
     })
 
   } catch (error: unknown) {
