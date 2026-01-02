@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Node, NodeStatus } from '@/types/node.types'
-import { Edit2, Trash2, ChevronRight } from 'lucide-react'
+import { Edit2, Trash2, ChevronRight, MessageSquare } from 'lucide-react'
 import { InfiniteCanvas } from './canvas/InfiniteCanvas'
 import { MindMapView } from './MindMapView'
+import { ChatPanel } from './ChatPanel'
+import { SkillsBadges } from './SkillsBadges'
 import { getUserRole, canEdit, type Role } from '@/lib/permissions'
 import { updateNodeStatusWithPropagation, enableAutoStatus, toggleNodeCritical, getNodeProgress } from '@/lib/status-aggregation'
 
@@ -20,6 +22,7 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
   const [loading, setLoading] = useState(true)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const [userRole, setUserRole] = useState<Role | null>(null)
   const [progress, setProgress] = useState({ total: 0, complete: 0, inProgress: 0, percentage: 0 })
 
@@ -43,7 +46,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
       await loadBreadcrumbs(data as Node)
       await loadRole(data.workspace_id)
       
-      // Load progress stats
       const stats = await getNodeProgress(data.id)
       setProgress(stats)
     }
@@ -78,13 +80,9 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
 
   async function updateStatus(newStatus: NodeStatus) {
     if (!node || !canEdit(userRole)) return
-
-    // Use propagation instead of direct update
     await updateNodeStatusWithPropagation(node.id, newStatus)
-    
-    // Reload to see changes
     await loadNode()
-    onNodeCreated() // Refresh sidebar
+    onNodeCreated()
   }
 
   async function deleteNode() {
@@ -106,6 +104,11 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
     window.dispatchEvent(event)
   }
 
+  const handleGenerateFromChat = async (messages: any[]) => {
+    console.log('Generate structure from chat:', messages)
+    alert('Generating structure from conversation... (Coming soon)')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -125,9 +128,7 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
   return (
     <>
       <div className="h-full flex flex-col">
-        {/* Header */}
         <div className="bg-white border-b px-6 py-4">
-          {/* Breadcrumbs */}
           {breadcrumbs.length > 1 && (
             <div className="flex items-center gap-2 text-sm mb-3 text-gray-600">
               {breadcrumbs.map((crumb, idx) => (
@@ -144,19 +145,17 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             </div>
           )}
 
-          {/* Title */}
           <h1 className="text-3xl font-bold text-gray-900 border-b-2 border-gray-300 inline-block pb-1">
             {node.name}
           </h1>
           
-          {/* Description */}
           {node.description && (
             <p className="text-gray-600 mt-3 text-base">
               {node.description}
             </p>
           )}
 
-          {/* Mind Map Visualization - Only for projects */}
+          {/* Mind Map - Only for projects */}
           {node.type === 'project' && (
             <div className="mt-6">
               <h3 className="text-sm font-bold text-gray-900 mb-3">Project Structure</h3>
@@ -164,9 +163,17 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             </div>
           )}
 
-          {/* Metadata row */}
+          {/* Skills Badges - Inline for features and systems */}
+          {(node.type === 'feature' || node.type === 'system') && (
+            <SkillsBadges
+              nodeId={node.id}
+              skills={node.skills || []}
+              coordinatorRole={node.coordinator_role || null}
+              onSkillsUpdated={loadNode}
+            />
+          )}
+
           <div className="mt-4 flex items-center gap-4 text-sm flex-wrap">
-            {/* Status dropdown or badge */}
             {canEdit(userRole) ? (
               <select
                 value={node.status}
@@ -202,7 +209,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               </span>
             )}
 
-            {/* Progress indicator - show if node has children */}
             {progress.total > 0 && (
               <div className="flex items-center gap-2">
                 <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -217,18 +223,15 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               </div>
             )}
 
-            {/* Auto-status toggle - only for editors - NO EMOJI */}
             {canEdit(userRole) && node.auto_status !== undefined && (
               <button
                 onClick={async () => {
                   if (node.auto_status) {
-                    // Disable auto (allow manual override)
                     await supabase
                       .from('nodes')
                       .update({ auto_status: false })
                       .eq('id', node.id)
                   } else {
-                    // Enable auto (re-calculate from children)
                     await enableAutoStatus(node.id)
                   }
                   await loadNode()
@@ -239,13 +242,11 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
                     ? 'bg-green-100 text-green-700' 
                     : 'bg-gray-100 text-gray-700'
                 }`}
-                title={node.auto_status ? 'Auto-calculated from children' : 'Manual status override'}
               >
                 {node.auto_status ? 'Auto' : 'Manual'}
               </button>
             )}
 
-            {/* Critical toggle - only for editors - NO EMOJI, just color dot */}
             {canEdit(userRole) && node.is_critical !== undefined && node.parent_id && (
               <button
                 onClick={async () => {
@@ -258,7 +259,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
                     ? 'bg-orange-100 text-orange-700' 
                     : 'bg-gray-100 text-gray-700'
                 }`}
-                title={node.is_critical ? 'Affects parent status' : 'Does not affect parent'}
               >
                 <div className={`w-2 h-2 rounded-full ${
                   node.is_critical ? 'bg-orange-500' : 'bg-gray-400'
@@ -275,20 +275,21 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               <span className="font-medium">Depth:</span> {node.depth}
             </div>
             
-            {node.importance && (
-              <div className="text-gray-500">
-                <span className="font-medium">Importance:</span> {node.importance}
-              </div>
-            )}
-            
             <div className="text-gray-500">
               <span className="font-medium">Created:</span>{' '}
               {new Date(node.created_at).toLocaleDateString()}
             </div>
 
-            {/* Edit & Delete buttons - only for editors */}
             {canEdit(userRole) && (
               <div className="ml-auto flex gap-2">
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="px-3 py-1.5 text-sm text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 flex items-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Chat
+                </button>
+
                 <button
                   onClick={() => setShowEditDialog(true)}
                   className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
@@ -307,7 +308,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
               </div>
             )}
 
-            {/* Show read-only badge for viewers */}
             {userRole === 'viewer' && (
               <div className="ml-auto">
                 <span className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
@@ -318,13 +318,20 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
           </div>
         </div>
 
-        {/* Canvas */}
         <div className="flex-1">
           <InfiniteCanvas nodeId={nodeId} />
         </div>
       </div>
 
-      {/* Edit dialog */}
+      {showChat && (
+        <ChatPanel
+          nodeId={node.id}
+          nodeName={node.name}
+          onClose={() => setShowChat(false)}
+          onGenerateStructure={handleGenerateFromChat}
+        />
+      )}
+
       {showEditDialog && (
         <EditNodeDialog
           node={node}
@@ -337,7 +344,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
         />
       )}
 
-      {/* Delete confirmation dialog */}
       {showDeleteDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
@@ -371,7 +377,6 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
   )
 }
 
-// Edit dialog component
 function EditNodeDialog({ 
   node, 
   onClose, 

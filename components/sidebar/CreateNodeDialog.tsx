@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { NodeType } from '@/types/node.types'
-import { X, Sparkles } from 'lucide-react'
+import { X } from 'lucide-react'
 
 interface CreateNodeDialogProps {
   parentNode?: { id: string; type: NodeType; path: string[]; depth: number; workspace_id: string } | null
@@ -17,7 +17,6 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [generatingAuto, setGeneratingAuto] = useState(false)
   
   const type: NodeType = 
     parentNode?.type === 'project' ? 'domain' :
@@ -25,7 +24,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
     parentNode?.type === 'system' ? 'feature' :
     parentNode?.type === 'feature' ? 'component' : 'project'
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -39,6 +38,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
         throw new Error('No workspace ID provided')
       }
 
+      // Create node
       const { data: nodeData, error: nodeError } = await supabase
         .from('nodes')
         .insert({
@@ -53,13 +53,16 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
           auto_status: true,
           is_critical: true,
           ai_suggested: false,
-          confirmed: true
+          confirmed: true,
+          skills: [],
+          coordinator_role: null
         })
         .select()
         .single()
 
       if (nodeError) throw nodeError
 
+      // Create canvas data
       const { error: canvasError } = await supabase
         .from('canvas_data')
         .insert({
@@ -68,6 +71,11 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
         })
 
       if (canvasError) throw canvasError
+
+      // Auto-generate skills in background (don't wait)
+      if (type === 'feature' || type === 'system') {
+        generateSkillsInBackground(nodeData.id, name, type, description || undefined)
+      }
 
       onCreated()
       onClose()
@@ -79,45 +87,21 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
     }
   }
 
-  const handleAutoGenerate = async () => {
-    if (!name.trim()) {
-      setError('Please enter a project name first')
-      return
-    }
-
-    setGeneratingAuto(true)
-    setError(null)
-
+  const generateSkillsInBackground = async (
+    nodeId: string,
+    nodeName: string,
+    nodeType: string,
+    nodeDescription?: string
+  ) => {
     try {
-      const finalWorkspaceId = parentNode?.workspace_id || workspaceId
-      if (!finalWorkspaceId) {
-        throw new Error('No workspace ID provided')
-      }
-
-      const response = await fetch('/api/generate-scaffold', {
+      await fetch('/api/generate-skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: description || name,
-          workspaceId: finalWorkspaceId,
-          projectName: name
-        })
+        body: JSON.stringify({ nodeId, nodeName, nodeType, nodeDescription })
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate scaffold')
-      }
-
-      console.log('✅ Generated scaffold:', data)
-      onCreated()
-      onClose()
-    } catch (err: any) {
-      console.error('Error generating scaffold:', err)
-      setError(err.message || 'Failed to generate scaffold')
-    } finally {
-      setGeneratingAuto(false)
+    } catch (error) {
+      console.error('Background skills generation failed:', error)
+      // Silent fail - skills can be regenerated later
     }
   }
 
@@ -126,7 +110,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-bold text-gray-900">
-            Create {type.charAt(0).toUpperCase() + type.slice(1)}
+            Add {type.charAt(0).toUpperCase() + type.slice(1)}
           </h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X className="w-5 h-5" />
@@ -140,7 +124,7 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
             </div>
           )}
 
-          <form onSubmit={handleManualSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-bold mb-2 text-gray-900">
                 Name <span className="text-red-500">*</span>
@@ -165,39 +149,29 @@ export function CreateNodeDialog({ parentNode, workspaceId, onClose, onCreated }
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
                 rows={3}
-                placeholder="Describe your project..."
+                placeholder="Describe this component..."
               />
-              <p className="text-xs text-gray-500 mt-1">
-                💡 More details help Auto generate better structure
-              </p>
             </div>
+
+            {(type === 'feature' || type === 'system') && (
+              <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
+                💡 Skills will be auto-generated after creation
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
                 className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
-                disabled={loading || generatingAuto}
+                disabled={loading}
               >
                 Cancel
               </button>
-
-              {type === 'project' && (
-                <button
-                  type="button"
-                  onClick={handleAutoGenerate}
-                  disabled={loading || generatingAuto || !name.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {generatingAuto ? 'Generating...' : 'Auto'}
-                </button>
-              )}
-
               <button
                 type="submit"
-                disabled={loading || generatingAuto}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading ? 'Creating...' : 'Create'}
               </button>

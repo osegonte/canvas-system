@@ -14,7 +14,7 @@ export type NodeStatus =
 // Importance level
 export type NodeImportance = 'critical' | 'important' | 'optional'
 
-// Add to existing Node interface
+// Node interface
 export interface Node {
   id: string
   workspace_id: string
@@ -33,13 +33,17 @@ export interface Node {
   auto_status: boolean
   is_critical: boolean
   
-  // ✅ NEW: AI metadata
+  // AI metadata
   ai_suggested: boolean
   ai_confidence: number | null
   confirmed: boolean
+  
+  // NEW FIELDS
+  skills: string[]
+  coordinator_role: string | null
 }
 
-// Update CreateNodeInput as well
+// CreateNodeInput interface
 export interface CreateNodeInput {
   workspace_id: string
   parent_id: string | null
@@ -55,8 +59,12 @@ export interface CreateNodeInput {
   auto_status?: boolean
   is_critical?: boolean
   
-  // ✅ NEW: AI metadata
+  // AI metadata
   ai_suggested?: boolean
   ai_confidence?: number
   confirmed?: boolean
+  
+  // NEW FIELDS
+  skills?: string[]
+  coordinator_role?: string
 }
