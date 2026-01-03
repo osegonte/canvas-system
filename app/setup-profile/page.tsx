@@ -42,13 +42,22 @@ export default function SetupProfilePage() {
     setUser(user)
 
     // Pre-fill username suggestion from email or name
-    const suggestedUsername = 
+    let suggestedUsername = 
       user.user_metadata?.preferred_username ||
       user.user_metadata?.user_name ||
       user.email?.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_') ||
       ''
     
     if (suggestedUsername) {
+      // Check if this username is already taken
+      const isAvailable = await checkUsernameAvailable(suggestedUsername)
+      
+      if (!isAvailable) {
+        // Username taken - add random number suffix
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000) // 1000-9999
+        suggestedUsername = `${suggestedUsername}${randomSuffix}`
+      }
+      
       setUsername(suggestedUsername)
     }
   }
@@ -207,7 +216,7 @@ export default function SetupProfilePage() {
               {!checking && available === false && username.length >= 3 && (
                 <div className="mt-1 text-xs text-red-600">
                   {/^[a-z0-9_]+$/.test(username) 
-                    ? 'Username already taken' 
+                    ? 'Username already taken - try adding numbers or changing it' 
                     : 'Invalid format'}
                 </div>
               )}
