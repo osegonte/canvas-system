@@ -28,7 +28,7 @@ export async function createUserProfile(
 
   const userNumber = numberData as string
 
-  // Create profile
+  // Create profile (username doesn't need to be unique!)
   const { data, error } = await supabase
     .from('user_profiles')
     .insert({
@@ -49,15 +49,7 @@ export async function createUserProfile(
   return data
 }
 
-export async function checkUsernameAvailable(username: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('username')
-    .eq('username', username.toLowerCase())
-    .single()
-
-  return !data && !error
-}
+// REMOVED: checkUsernameAvailable - not needed anymore!
 
 export async function getUserByNumber(userNumber: string) {
   const { data } = await supabase
@@ -72,11 +64,11 @@ export async function getUserByNumber(userNumber: string) {
 export async function searchUsers(query: string) {
   // Support searching by:
   // - User number: #0042 or 0042
-  // - Username: victor or @victor
+  // - Username: victor or @victor (can have duplicates!)
   
   const cleanQuery = query.replace(/^[@#]/, '').toLowerCase()
 
-  // Try user number first
+  // Try user number first (this is UNIQUE)
   if (/^\d+$/.test(cleanQuery)) {
     const paddedNumber = cleanQuery.padStart(4, '0')
     const { data } = await supabase
@@ -88,7 +80,7 @@ export async function searchUsers(query: string) {
     return data ? [data] : []
   }
 
-  // Search by username
+  // Search by username (can return MULTIPLE results!)
   const { data } = await supabase
     .from('user_profiles')
     .select('*')
