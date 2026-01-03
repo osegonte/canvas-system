@@ -138,12 +138,12 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
   return (
     <>
       <div className="h-full flex flex-col">
-        <div className="bg-white border-b px-6 py-4">
+        <div className="bg-white border-b px-3 sm:px-6 py-3 sm:py-4 overflow-y-auto">
           {breadcrumbs.length > 1 && (
-            <div className="flex items-center gap-2 text-sm mb-3 text-gray-600">
+            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm mb-2 sm:mb-3 text-gray-600 overflow-x-auto pb-1">
               {breadcrumbs.map((crumb, idx) => (
                 <div key={crumb.id} className="flex items-center gap-2">
-                  {idx > 0 && <ChevronRight className="w-4 h-4" />}
+                  {idx > 0 && <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />}
                   <button
                     onClick={() => handleBreadcrumbClick(crumb.id)}
                     className={`hover:text-blue-600 ${idx === breadcrumbs.length - 1 ? 'font-medium text-gray-900' : ''}`}
@@ -155,12 +155,12 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             </div>
           )}
 
-          <h1 className="text-3xl font-bold text-gray-900 border-b-2 border-gray-300 inline-block pb-1">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 border-b-2 border-gray-300 inline-block pb-1 break-words">
             {node.name}
           </h1>
           
           {node.description && (
-            <p className="text-gray-600 mt-3 text-base">
+            <p className="text-gray-600 mt-2 sm:mt-3 text-sm sm:text-base">
               {node.description}
             </p>
           )}
@@ -183,13 +183,13 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             />
           )}
 
-          <div className="mt-4 flex items-center gap-4 text-sm flex-wrap">
+          <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
             {canEdit(userRole) ? (
               <select
                 value={node.status}
                 onChange={(e) => updateStatus(e.target.value as NodeStatus)}
                 className={`
-                  px-3 py-1 text-sm rounded-full font-medium border-2 cursor-pointer
+                  px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full font-medium border-2 cursor-pointer w-full sm:w-auto
                   ${node.status === 'complete' ? 'bg-green-100 text-green-700 border-green-300' : ''}
                   ${node.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''}
                   ${node.status === 'mvp' ? 'bg-blue-100 text-blue-700 border-blue-300' : ''}
@@ -220,8 +220,8 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             )}
 
             {progress.total > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex-1 sm:w-24 md:w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-blue-600 transition-all"
                     style={{ width: `${progress.percentage}%` }}
@@ -267,29 +267,29 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
             </div>
 
             {canEdit(userRole) && (
-              <div className="ml-auto flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
                 <button
                   onClick={() => setShowChat(true)}
-                  className="px-3 py-1.5 text-sm text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 flex items-center gap-2"
+                  className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 flex items-center justify-center gap-2"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  Chat
+                  <span className="sm:inline">Chat</span>
                 </button>
 
                 <button
                   onClick={() => setShowEditDialog(true)}
-                  className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                  className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center justify-center gap-2"
                 >
                   <Edit2 className="w-4 h-4" />
-                  Edit
+                  <span className="sm:inline">Edit</span>
                 </button>
 
                 <button
                   onClick={() => setShowDeleteDialog(true)}
-                  className="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50 flex items-center gap-2"
+                  className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50 flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  <span className="sm:inline">Delete</span>
                 </button>
               </div>
             )}
@@ -331,26 +331,26 @@ export function NodeView({ nodeId, onNodeCreated }: NodeViewProps) {
       )}
 
       {showDeleteDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-2">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2">
                 Delete {node.name}?
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-sm sm:text-base text-gray-600 mb-4">
                 This will permanently delete this {node.type} and all of its children. This action cannot be undone.
               </p>
               
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col sm:flex-row justify-end gap-2">
                 <button
                   onClick={() => setShowDeleteDialog(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
+                  className="w-full sm:w-auto px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={deleteNode}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
                 >
                   Delete
                 </button>

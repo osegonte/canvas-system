@@ -101,9 +101,9 @@ export default function HomePage() {
   return (
     <div className="flex h-screen overflow-hidden flex-col">
       {/* Top bar */}
-      <div className="bg-white border-b px-6 py-3 flex items-center justify-between">
+      <div className="bg-white border-b px-3 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-gray-900">
+          <h1 className="text-base sm:text-lg font-semibold text-gray-900">
             Canvas Project System
           </h1>
           <WorkspaceSelector
@@ -112,15 +112,15 @@ export default function HomePage() {
           />
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">
+          <span className="hidden lg:block text-sm text-gray-600">
             {user.email}
           </span>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+            className="flex items-center gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 rounded-md"
           >
             <LogOut className="w-4 h-4" />
-            Logout
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </div>
@@ -130,7 +130,7 @@ export default function HomePage() {
         {/* Mobile hamburger button */}
         <button
           onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-          className="md:hidden fixed bottom-4 right-4 z-50 p-3 bg-blue-600 text-white rounded-full shadow-lg"
+          className="md:hidden fixed bottom-6 right-4 z-50 p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700"
         >
           {showMobileSidebar ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -149,6 +149,7 @@ export default function HomePage() {
           transform transition-transform duration-200 ease-in-out
           ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0
+          w-[280px] md:w-64
         `}>
           <WorkspaceSidebar
             key={`${refreshKey}-${currentWorkspaceId}`}
@@ -168,14 +169,14 @@ export default function HomePage() {
               onNodeCreated={handleNodeCreated}
             />
           ) : (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full px-4">
               <div className="text-center">
-                <div className="text-6xl mb-4">👋</div>
-                <h2 className="text-2xl font-semibold text-gray-700 mb-2">
+                <div className="text-5xl sm:text-6xl mb-4">👋</div>
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-2">
                   Welcome to Canvas
                 </h2>
-                <p className="text-gray-500">
-                  Select a project from the sidebar to get started
+                <p className="text-sm sm:text-base text-gray-500">
+                  Tap the menu to select a project
                 </p>
               </div>
             </div>

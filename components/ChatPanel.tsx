@@ -180,21 +180,21 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
   }
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white border-l border-gray-200 shadow-2xl flex flex-col z-50">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <div>
-          <h3 className="font-bold text-gray-900">AI Assistant</h3>
-          <p className="text-xs text-gray-500">{nodeName}</p>
+    <div className="fixed inset-0 md:right-0 md:left-auto md:w-96 bg-white md:border-l border-gray-200 md:shadow-2xl flex flex-col z-50">
+      <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">AI Assistant</h3>
+          <p className="text-xs text-gray-500 truncate">{nodeName}</p>
         </div>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-400 text-sm mt-8">
-            <div className="text-4xl mb-2">💬</div>
+            <div className="text-3xl sm:text-4xl mb-2">💬</div>
             <p>Start planning your {nodeName}</p>
             <p className="text-xs mt-2">Ask questions, share ideas, or upload images</p>
           </div>
@@ -206,13 +206,13 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+              className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2 ${
                 msg.role === 'user'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-900'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
             </div>
           </div>
         ))}
@@ -229,10 +229,10 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
       </div>
 
       {uploadedImages.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-200 flex gap-2 overflow-x-auto">
+        <div className="px-3 sm:px-4 py-2 border-t border-gray-200 flex gap-2 overflow-x-auto">
           {uploadedImages.map((img, idx) => (
             <div key={idx} className="relative">
-              <img src={img} alt="Upload" className="w-16 h-16 object-cover rounded" />
+              <img src={img} alt="Upload" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded" />
               <button
                 onClick={() => setUploadedImages(prev => prev.filter((_, i) => i !== idx))}
                 className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
@@ -244,15 +244,15 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
         </div>
       )}
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-3 sm:p-4 border-t border-gray-200">
         {!recording ? (
-          <div className="bg-gray-50 rounded-full flex items-center gap-2 px-4 py-3 border border-gray-200">
+          <div className="bg-gray-50 rounded-full flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 border border-gray-200">
             <button
               onClick={() => fileInputRef.current?.click()}
               className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
               title="Upload image"
             >
-              <Plus className="w-5 h-5 text-gray-600" />
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
             </button>
 
             <input
@@ -271,7 +271,7 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
               title="Voice input"
               disabled={loading}
             >
-              <Mic className="w-5 h-5 text-gray-600" />
+              <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
             </button>
 
             {input.trim() && (
@@ -280,16 +280,16 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
                 disabled={loading}
                 className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
               >
-                <Send className="w-5 h-5 text-gray-600" />
+                <Send className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
               </button>
             )}
           </div>
         ) : (
-          <div className="bg-gray-900 rounded-lg p-4">
+          <div className="bg-gray-900 rounded-lg p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Mic className="w-5 h-5 text-white animate-pulse" />
-                <span className="text-white text-sm font-medium">
+                <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-pulse" />
+                <span className="text-white text-xs sm:text-sm font-medium">
                   Listening<span className="animate-pulse">...</span>
                 </span>
               </div>
@@ -318,7 +318,7 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
         {messages.length > 0 && (
           <button
             onClick={() => onGenerateStructure(messages)}
-            className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium"
           >
             Generate Structure from Chat
           </button>
