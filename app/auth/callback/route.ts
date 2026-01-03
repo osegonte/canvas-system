@@ -12,11 +12,38 @@ export async function GET(request: Request) {
     )
     
     try {
-      await supabase.auth.exchangeCodeForSession(code)
+      // Exchange code for session
+      const { data: { user }, error: authError } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (authError) {
+        console.error('Auth error:', authError)
+        throw authError
+      }
+
+      if (user) {
+        // Check if user has profile
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single()
+
+        if (!profile) {
+          // No profile yet - redirect to setup
+          return NextResponse.redirect(new URL('/setup-profile', requestUrl.origin))
+        }
+
+        // Profile exists - redirect to app
+        return NextResponse.redirect(new URL('/', requestUrl.origin))
+      }
+
     } catch (error) {
-      console.error('Error exchanging code for session:', error)
+      console.error('Error in auth callback:', error)
+      // Redirect to login with error
+      return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
     }
   }
 
-  return NextResponse.redirect(new URL('/', requestUrl.origin))
+  // No code - redirect to login
+  return NextResponse.redirect(new URL('/login', requestUrl.origin))
 }

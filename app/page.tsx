@@ -31,6 +31,18 @@ export default function HomePage() {
       return
     }
 
+    // Check if user has profile
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!profile) {
+      router.push('/setup-profile')
+      return
+    }
+
     setUser(user)
     await ensureWorkspace(user.id)
     setLoading(false)

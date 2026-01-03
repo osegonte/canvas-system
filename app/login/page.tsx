@@ -1,52 +1,41 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { Github } from 'lucide-react'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  async function checkUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      router.push('/')
+    }
+  }
+
+  async function signInWithGitHub() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
     })
 
     if (error) {
       setError(error.message)
       setLoading(false)
-    } else {
-      router.push('/')
-      router.refresh()
     }
-  }
-
-  const handleSignup = async () => {
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setMessage('Check your email for confirmation link!')
-    }
-    setLoading(false)
   }
 
   return (
@@ -62,64 +51,30 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-8">
-          <form onSubmit={handleLogin} className="space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-
-            {message && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
-                {message}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
-                required
-                autoFocus
-              />
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+              {error}
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
-                required
-              />
-            </div>
+          <button
+            onClick={signInWithGitHub}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <Github className="w-5 h-5" />
+            <span className="font-medium">
+              {loading ? 'Signing in...' : 'Continue with GitHub'}
+            </span>
+          </button>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:opacity-50"
-            >
-              {loading ? 'Loading...' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={handleSignup}
-              disabled={loading}
-              className="text-sm text-blue-600 hover:text-blue-700"
-            >
-              Don't have an account? Sign up
-            </button>
+          <div className="mt-4 text-center text-xs text-gray-500">
+            We'll add Google sign-in later
           </div>
+        </div>
+
+        <div className="mt-4 text-center text-xs text-gray-500">
+          By continuing, you agree to Canvas's Terms of Service and Privacy Policy
         </div>
       </div>
     </div>
