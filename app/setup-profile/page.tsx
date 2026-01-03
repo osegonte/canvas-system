@@ -27,16 +27,14 @@ export default function SetupProfilePage() {
 
     setUser(user)
 
-    // Pre-fill username suggestion from GitHub/OAuth
+    // Get username from GitHub
     const suggestedUsername = 
       user.user_metadata?.preferred_username ||
       user.user_metadata?.user_name ||
       user.email?.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_') ||
       ''
     
-    if (suggestedUsername) {
-      setUsername(suggestedUsername)
-    }
+    setUsername(suggestedUsername)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -48,7 +46,6 @@ export default function SetupProfilePage() {
     setError(null)
 
     try {
-      // Get display name from OAuth metadata
       const displayName = 
         user.user_metadata?.full_name || 
         user.user_metadata?.name || 
@@ -60,10 +57,8 @@ export default function SetupProfilePage() {
         user.user_metadata?.picture || 
         null
 
-      // Create profile (username doesn't need to be unique!)
-      const profile = await createUserProfile(user.id, username, displayName, avatarUrl)
-
-      console.log('✅ Profile created:', profile)
+      // Create profile - will auto-assign user number
+      await createUserProfile(user.id, username, displayName, avatarUrl)
 
       // Create default workspace
       const { data: workspace, error: workspaceError } = await supabase
@@ -77,35 +72,23 @@ export default function SetupProfilePage() {
         .select()
         .single()
 
-      if (workspaceError) {
-        console.error('Workspace error:', workspaceError)
-        throw workspaceError
-      }
+      if (workspaceError) throw workspaceError
 
       if (workspace) {
-        // Add user as owner
-        const { error: memberError } = await supabase
+        await supabase
           .from('workspace_members')
           .insert({
             workspace_id: workspace.id,
             user_id: user.id,
             role: 'owner'
           })
-
-        if (memberError) {
-          console.error('Member error:', memberError)
-          throw memberError
-        }
       }
 
-      console.log('✅ Workspace created:', workspace)
-
-      // Success! Redirect to app
       router.push('/')
       router.refresh()
 
     } catch (err: any) {
-      console.error('❌ Error creating profile:', err)
+      console.error('Error:', err)
       setError(err.message || 'Failed to create profile')
       setLoading(false)
     }
@@ -134,7 +117,7 @@ export default function SetupProfilePage() {
             Welcome to Canvas!
           </h1>
           <p className="text-gray-600">
-            Choose your username to get started
+            Choose your username
           </p>
         </div>
 
@@ -163,12 +146,6 @@ export default function SetupProfilePage() {
                 autoFocus
                 disabled={loading}
               />
-              <div className="mt-2 text-xs text-gray-500">
-                Lowercase letters, numbers, and underscores only (3-20 characters)
-              </div>
-              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                💡 Your unique ID will be assigned after signup (e.g., #0001)
-              </div>
             </div>
 
             <button
@@ -179,10 +156,6 @@ export default function SetupProfilePage() {
               {loading ? 'Creating profile...' : 'Continue'}
             </button>
           </form>
-        </div>
-
-        <div className="mt-4 text-center text-xs text-gray-500">
-          Usernames don't need to be unique - you'll get a unique user number!
         </div>
       </div>
     </div>

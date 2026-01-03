@@ -1,16 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
 
-export async function getOrCreateUserProfile(userId: string) {
-  // Check if profile exists
-  const { data: existingProfile } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
-
-  return existingProfile
-}
-
 export async function createUserProfile(
   userId: string,
   username: string,
@@ -22,13 +11,12 @@ export async function createUserProfile(
     .rpc('get_next_user_number')
 
   if (numberError) {
-    console.error('Error getting user number:', numberError)
     throw new Error('Failed to generate user number')
   }
 
   const userNumber = numberData as string
 
-  // Create profile (username doesn't need to be unique!)
+  // Save username + assign ID
   const { data, error } = await supabase
     .from('user_profiles')
     .insert({
@@ -41,15 +29,10 @@ export async function createUserProfile(
     .select()
     .single()
 
-  if (error) {
-    console.error('Error creating profile:', error)
-    throw error
-  }
+  if (error) throw error
 
   return data
 }
-
-// REMOVED: checkUsernameAvailable - not needed anymore!
 
 export async function getUserByNumber(userNumber: string) {
   const { data } = await supabase
@@ -62,13 +45,9 @@ export async function getUserByNumber(userNumber: string) {
 }
 
 export async function searchUsers(query: string) {
-  // Support searching by:
-  // - User number: #0042 or 0042
-  // - Username: victor or @victor (can have duplicates!)
-  
   const cleanQuery = query.replace(/^[@#]/, '').toLowerCase()
 
-  // Try user number first (this is UNIQUE)
+  // Search by user number (unique)
   if (/^\d+$/.test(cleanQuery)) {
     const paddedNumber = cleanQuery.padStart(4, '0')
     const { data } = await supabase
@@ -80,7 +59,7 @@ export async function searchUsers(query: string) {
     return data ? [data] : []
   }
 
-  // Search by username (can return MULTIPLE results!)
+  // Search by username (may return multiple)
   const { data } = await supabase
     .from('user_profiles')
     .select('*')
