@@ -102,14 +102,29 @@ export default function HomePage() {
     <div className="flex h-screen overflow-hidden flex-col">
       {/* Top bar */}
       <div className="bg-white border-b px-3 sm:px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-base sm:text-lg font-semibold text-gray-900">
-            Canvas Project System
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+          {/* Hamburger - only on mobile */}
+          <button
+            onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+            className="md:hidden p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
+          >
+            {showMobileSidebar ? (
+              <X className="w-6 h-6 text-gray-700" />
+            ) : (
+              <Menu className="w-6 h-6 text-gray-700" />
+            )}
+          </button>
+          {/* Hide "Canvas Project System" on mobile, show on desktop */}
+          <h1 className="hidden md:block text-lg font-semibold text-gray-900">
+            Canvas
           </h1>
-          <WorkspaceSelector
-            currentWorkspaceId={currentWorkspaceId}
-            onWorkspaceChange={handleWorkspaceChange}
-          />
+          {/* Workspace selector - show on desktop in header */}
+          <div className="hidden md:block">
+            <WorkspaceSelector
+              currentWorkspaceId={currentWorkspaceId}
+              onWorkspaceChange={handleWorkspaceChange}
+            />
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <span className="hidden lg:block text-sm text-gray-600">
@@ -125,16 +140,16 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Mobile workspace selector - full width below header */}
+      <div className="md:hidden bg-white border-b px-3 py-2">
+        <WorkspaceSelector
+          currentWorkspaceId={currentWorkspaceId}
+          onWorkspaceChange={handleWorkspaceChange}
+        />
+      </div>
+
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Mobile hamburger button */}
-        <button
-          onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-          className="md:hidden fixed bottom-6 right-4 z-50 p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700"
-        >
-          {showMobileSidebar ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-
         {/* Mobile overlay */}
         {showMobileSidebar && (
           <div 
