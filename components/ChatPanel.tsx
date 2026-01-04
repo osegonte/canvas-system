@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
 import { X, Plus, Mic, Send, Loader2 } from 'lucide-react'
 
 interface Message {
@@ -20,6 +21,7 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(true)
   const [recording, setRecording] = useState(false)
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
   
@@ -28,9 +30,59 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Load chat history when component mounts
+  useEffect(() => {
+    loadChatHistory()
+  }, [nodeId])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  async function loadChatHistory() {
+    try {
+      setLoadingHistory(true)
+
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('node_id', nodeId)
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error('Error loading chat history:', error)
+      } else if (data) {
+        const loadedMessages: Message[] = data.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at)
+        }))
+        setMessages(loadedMessages)
+      }
+    } catch (err) {
+      console.error('Failed to load chat history:', err)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  async function saveMessage(role: 'user' | 'assistant', content: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase
+        .from('chat_messages')
+        .insert({
+          node_id: nodeId,
+          user_id: user.id,
+          role,
+          content
+        })
+    } catch (err) {
+      console.error('Failed to save message:', err)
+    }
+  }
 
   const sendMessage = async () => {
     if (!input.trim() && uploadedImages.length === 0) return
@@ -42,6 +94,10 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
     }
 
     setMessages(prev => [...prev, userMessage])
+    
+    // Save user message to database
+    await saveMessage('user', input)
+    
     setInput('')
     setLoading(true)
 
@@ -69,6 +125,10 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
       }
 
       setMessages(prev => [...prev, assistantMessage])
+      
+      // Save assistant message to database
+      await saveMessage('assistant', data.message)
+      
       setUploadedImages([])
 
     } catch (error: any) {
@@ -87,7 +147,7 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
   const startRecording = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Your browser does not support microphone access. Please use Chrome, Edge, or Safari.')
+        throw new Error('Your browser does not support microphone access.')
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -104,17 +164,7 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
 
     } catch (error: any) {
       console.error('Error starting recording:', error)
-      
-      let errorMsg = 'Could not access microphone.'
-      if (error.name === 'NotAllowedError') {
-        errorMsg = 'Microphone access denied. Please allow microphone access in your browser settings.'
-      } else if (error.name === 'NotFoundError') {
-        errorMsg = 'No microphone found. Please connect a microphone.'
-      } else if (error.message) {
-        errorMsg = error.message
-      }
-      
-      alert(errorMsg)
+      alert(error.message || 'Could not access microphone')
     }
   }
 
@@ -179,24 +229,67 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
     })
   }
 
+  async function clearHistory() {
+    if (!confirm('Clear all chat history for this node? This cannot be undone.')) return
+
+    try {
+      await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('node_id', nodeId)
+
+      setMessages([])
+    } catch (err) {
+      console.error('Failed to clear history:', err)
+      alert('Failed to clear history')
+    }
+  }
+
+  if (loadingHistory) {
+    return (
+      <div className="fixed inset-0 md:right-0 md:left-auto md:w-96 bg-white md:border-l border-gray-200 md:shadow-2xl flex items-center justify-center z-50">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading chat history...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 md:right-0 md:left-auto md:w-96 bg-white md:border-l border-gray-200 md:shadow-2xl flex flex-col z-50">
-      <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200">
+      {/* Header - Mobile friendly */}
+      <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-white">
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">AI Assistant</h3>
           <p className="text-xs text-gray-500 truncate">{nodeName}</p>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2 ml-2">
+          {messages.length > 0 && (
+            <button
+              onClick={clearHistory}
+              className="text-xs text-gray-500 hover:text-red-600 px-2 py-1"
+              title="Clear history"
+            >
+              Clear
+            </button>
+          )}
+          <button 
+            onClick={onClose} 
+            className="p-1.5 hover:bg-gray-100 rounded flex-shrink-0"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
+      {/* Messages - scrollable */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-400 text-sm mt-8">
             <div className="text-3xl sm:text-4xl mb-2">💬</div>
             <p>Start planning your {nodeName}</p>
-            <p className="text-xs mt-2">Ask questions, share ideas, or upload images</p>
+            <p className="text-xs mt-2">Your conversation is saved automatically</p>
           </div>
         )}
 
@@ -228,10 +321,11 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Image previews */}
       {uploadedImages.length > 0 && (
         <div className="px-3 sm:px-4 py-2 border-t border-gray-200 flex gap-2 overflow-x-auto">
           {uploadedImages.map((img, idx) => (
-            <div key={idx} className="relative">
+            <div key={idx} className="relative flex-shrink-0">
               <img src={img} alt="Upload" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded" />
               <button
                 onClick={() => setUploadedImages(prev => prev.filter((_, i) => i !== idx))}
@@ -244,50 +338,62 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
         </div>
       )}
 
-      <div className="p-3 sm:p-4 border-t border-gray-200">
+      {/* Input area - Mobile optimized */}
+      <div className="p-3 sm:p-4 border-t border-gray-200 bg-white">
         {!recording ? (
-          <div className="bg-gray-50 rounded-full flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 border border-gray-200">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
-              title="Upload image"
-            >
-              <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-            </button>
-
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="Ask anything"
-              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 placeholder-gray-400"
-              disabled={loading}
-            />
-
-            <button
-              onClick={startRecording}
-              className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
-              title="Voice input"
-              disabled={loading}
-            >
-              <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-            </button>
-
-            {input.trim() && (
+          <>
+            <div className="bg-gray-50 rounded-full flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 border border-gray-200">
               <button
-                onClick={sendMessage}
-                disabled={loading}
+                onClick={() => fileInputRef.current?.click()}
                 className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
+                title="Upload image"
               >
-                <Send className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+              </button>
+
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                placeholder="Ask anything..."
+                className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 placeholder-gray-400"
+                disabled={loading}
+              />
+
+              <button
+                onClick={startRecording}
+                className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
+                title="Voice input"
+                disabled={loading}
+              >
+                <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+              </button>
+
+              {input.trim() && (
+                <button
+                  onClick={sendMessage}
+                  disabled={loading}
+                  className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
+                >
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                </button>
+              )}
+            </div>
+
+            {messages.length > 0 && (
+              <button
+                onClick={() => onGenerateStructure(messages)}
+                className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium"
+              >
+                Generate Structure from Chat
               </button>
             )}
-          </div>
+          </>
         ) : (
           <div className="bg-gray-900 rounded-lg p-3 sm:p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-pulse" />
                 <span className="text-white text-xs sm:text-sm font-medium">
                   Listening<span className="animate-pulse">...</span>
@@ -297,31 +403,22 @@ export function ChatPanel({ nodeId, nodeName, onClose, onGenerateStructure }: Ch
               <div className="flex items-center gap-2">
                 <button
                   onClick={cancelRecording}
-                  className="p-2 hover:bg-gray-800 rounded-full flex-shrink-0"
+                  className="p-1.5 sm:p-2 hover:bg-gray-800 rounded-full flex-shrink-0"
                   title="Cancel"
                 >
-                  <X className="w-5 h-5 text-white" />
+                  <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </button>
 
                 <button
                   onClick={stopRecording}
-                  className="p-2 bg-blue-600 hover:bg-blue-700 rounded-full flex-shrink-0"
+                  className="p-1.5 sm:p-2 bg-blue-600 hover:bg-blue-700 rounded-full flex-shrink-0"
                   title="Send"
                 >
-                  <Send className="w-4 h-4 text-white" />
+                  <Send className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                 </button>
               </div>
             </div>
           </div>
-        )}
-
-        {messages.length > 0 && (
-          <button
-            onClick={() => onGenerateStructure(messages)}
-            className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium"
-          >
-            Generate Structure from Chat
-          </button>
         )}
       </div>
 
